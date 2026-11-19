@@ -1,0 +1,38 @@
+services:
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: >
+      gcloud beta emulators pubsub start
+      --host-port=0.0.0.0:8085
+      --project=${PUBSUB_PROJECT_ID}
+    ports:
+      - "8085:8085"
+
+  pubsub-init:
+    image: curlimages/curl:8.11.1
+    depends_on:
+      - pubsub-emulator
+    environment:
+      PUBSUB_HOST: pubsub-emulator:8085
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID}
+    volumes:
+      - ./infra/pubsub:/init:ro
+    entrypoint: ["/bin/sh", "/init/create-topics.sh"]
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:
